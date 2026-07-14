@@ -87,6 +87,12 @@
     z-index: 1;
     pointer-events: none;
   }
+
+  #debugLine {
+    margin-top: 14px;
+    font-size: 11px;
+    color: #999;
+  }
 </style>
 </head>
 <body>
@@ -98,7 +104,7 @@
       <h1>Deal Won!</h1>
       <p><span class="deal-name" id="dealName">This deal</span> just closed. Nice work!</p>
       <button id="closeBtn">Close</button>
-      <p id="debugLine" style="margin-top:14px;font-size:11px;color:#999;"></p>
+      <p id="debugLine"></p>
     </div>
   </div>
 
@@ -164,42 +170,28 @@
     ctx.clearRect(0, 0, W, H);
   }
 
-  function closeWidget() {
-    stopConfetti();
-    var debugMsgs = [];
+  // --- New: respond to Client Script's notify(), instead of trying to self-close ---
+  ZOHO.embeddedApp.on("NotifyAndWait", function (data) {
+    return new Promise(function (resolve) {
+      var resolved = false;
 
-    debugMsgs.push("$Client exists: " + (typeof window.$Client !== "undefined"));
-    debugMsgs.push("ZOHO.CRM exists: " + (typeof window.ZOHO !== "undefined" && typeof ZOHO.CRM !== "undefined"));
-
-    try {
-      window.parent.postMessage({ action: "closeCelebrationWidget" }, "*");
-      debugMsgs.push("Sent postMessage to parent");
-    } catch (e) {
-      debugMsgs.push("postMessage failed: " + e.message);
-    }
-
-    try {
-      if (typeof window.$Client !== "undefined" && typeof $Client.close === "function") {
-        debugMsgs.push("Calling $Client.close()");
-        $Client.close({ status: "closed" });
-      } else if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI && ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.closeReload) {
-        debugMsgs.push("Calling ZOHO.CRM.UI.Popup.closeReload()");
-        ZOHO.CRM.UI.Popup.closeReload();
-      } else if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI && ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.close) {
-        debugMsgs.push("Calling ZOHO.CRM.UI.Popup.close()");
-        ZOHO.CRM.UI.Popup.close();
-      } else {
-        debugMsgs.push("No known close method found on window");
+      function finish(reason) {
+        if (resolved) return;
+        resolved = true;
+        stopConfetti();
+        document.getElementById('debugLine').textContent = "Resolved: " + reason;
+        resolve({ action: "close", reason: reason });
       }
-    } catch (e) {
-      debugMsgs.push("Error: " + e.message);
-    }
 
-    document.getElementById('debugLine').textContent = debugMsgs.join(" | ");
-    console.log(debugMsgs.join(" | "));
-  }
+      document.getElementById('closeBtn').addEventListener('click', function () {
+        finish("manual");
+      });
 
-  document.getElementById('closeBtn').addEventListener('click', closeWidget);
+      setTimeout(function () {
+        finish("timeout");
+      }, DURATION);
+    });
+  });
 
   ZOHO.embeddedApp.on("PageLoad", function (data) {
     if (data && data.EntityId) {
@@ -215,8 +207,6 @@
   });
 
   ZOHO.embeddedApp.init();
-
-  setTimeout(closeWidget, DURATION);
 </script>
 
 </body>
