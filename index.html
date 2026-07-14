@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Deal Won Celebration</title>
+<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 20, 30, 0.55);
+  }
+
+  #card {
+    position: relative;
+    z-index: 2;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 40px 56px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    transform: scale(0.85);
+    opacity: 0;
+    animation: pop 0.45s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+
+  @keyframes pop {
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  #card .emoji {
+    font-size: 56px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  #card h1 {
+    margin: 0 0 6px 0;
+    font-size: 24px;
+    color: #1a1a2e;
+  }
+
+  #card p {
+    margin: 0;
+    font-size: 16px;
+    color: #555;
+    max-width: 320px;
+  }
+
+  #card .deal-name {
+    font-weight: 700;
+    color: #16a34a;
+  }
+
+  #closeBtn {
+    margin-top: 22px;
+    border: none;
+    background: #16a34a;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #closeBtn:hover {
+    background: #128a3e;
+  }
+
+  canvas#confetti {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+  <div id="overlay">
+    <canvas id="confetti"></canvas>
+    <div id="card">
+      <div class="emoji">🎉</div>
+      <h1>Deal Won!</h1>
+      <p><span class="deal-name" id="dealName">This deal</span> just closed. Nice work!</p>
+      <button id="closeBtn">Close</button>
+      <p id="debugLine" style="margin-top:14px;font-size:11px;color:#999;"></p>
+    </div>
+  </div>
+
+<script>
+  var canvas = document.getElementById('confetti');
+  var ctx = canvas.getContext('2d');
+  var W, H;
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var colors = ['#16a34a', '#f59e0b', '#3b82f6', '#ef4444', '#a855f7', '#facc15'];
+  var pieces = [];
+  var PIECE_COUNT = 160;
+
+  function makePiece() {
+    return {
+      x: Math.random() * W,
+      y: -20 - Math.random() * H * 0.5,
+      w: 6 + Math.random() * 6,
+      h: 10 + Math.random() * 8,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      speedY: 2 + Math.random() * 3,
+      speedX: -1.5 + Math.random() * 3,
+      rotation: Math.random() * 360,
+      rotationSpeed: -6 + Math.random() * 12
+    };
+  }
+
+  for (var i = 0; i < PIECE_COUNT; i++) pieces.push(makePiece());
+
+  var running = true;
+  var DURATION = 3200;
+
+  function draw() {
+    if (!running) return;
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < pieces.length; i++) {
+      var p = pieces[i];
+      p.y += p.speedY;
+      p.x += p.speedX;
+      p.rotation += p.rotationSpeed;
+      if (p.y > H + 20) {
+        pieces[i] = makePiece();
+        pieces[i].y = -20;
+      }
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  function stopConfetti() {
+    running = false;
+    ctx.clearRect(0, 0, W, H);
+  }
+
+  function closeWidget() {
+    stopConfetti();
+    var debugMsgs = [];
+
+    debugMsgs.push("$Client exists: " + (typeof window.$Client !== "undefined"));
+    debugMsgs.push("ZOHO.CRM exists: " + (typeof window.ZOHO !== "undefined" && typeof ZOHO.CRM !== "undefined"));
+
+    try {
+      window.parent.postMessage({ action: "closeCelebrationWidget" }, "*");
+      debugMsgs.push("Sent postMessage to parent");
+    } catch (e) {
+      debugMsgs.push("postMessage failed: " + e.message);
+    }
+
+    try {
+      if (typeof window.$Client !== "undefined" && typeof $Client.close === "function") {
+        debugMsgs.push("Calling $Client.close()");
+        $Client.close({ status: "closed" });
+      } else if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI && ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.closeReload) {
+        debugMsgs.push("Calling ZOHO.CRM.UI.Popup.closeReload()");
+        ZOHO.CRM.UI.Popup.closeReload();
+      } else if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI && ZOHO.CRM.UI.Popup && ZOHO.CRM.UI.Popup.close) {
+        debugMsgs.push("Calling ZOHO.CRM.UI.Popup.close()");
+        ZOHO.CRM.UI.Popup.close();
+      } else {
+        debugMsgs.push("No known close method found on window");
+      }
+    } catch (e) {
+      debugMsgs.push("Error: " + e.message);
+    }
+
+    document.getElementById('debugLine').textContent = debugMsgs.join(" | ");
+    console.log(debugMsgs.join(" | "));
+  }
+
+  document.getElementById('closeBtn').addEventListener('click', closeWidget);
+
+  ZOHO.embeddedApp.on("PageLoad", function (data) {
+    if (data && data.EntityId) {
+      ZOHO.CRM.API.getRecord({ Entity: "Deals", RecordID: data.EntityId })
+        .then(function (res) {
+          var record = res && res.data && res.data[0];
+          if (record && record.Deal_Name) {
+            document.getElementById('dealName').textContent = record.Deal_Name;
+          }
+        })
+        .catch(function () {});
+    }
+  });
+
+  ZOHO.embeddedApp.init();
+
+  setTimeout(closeWidget, DURATION);
+</script>
+
+</body>
+</html>
